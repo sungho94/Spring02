@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="mapperInterface.BoardMapper">
+
+<!-- ** SearchCriteria PageList : ver02 
+=> sql Tag : 필요한 구문을 만들어 놓고 필요할때마다 호출가능
+=> 호출 Tag : include 
+             적용 범위 -> "and 나머지조건)"
+           where (seq>0 "and 나머지조건)"
+=> 조건문 : serachType: title, keyword : Java
+           where title like '%Java%'           
+           -> where title like '%'+#{keyword}+'%'
+           매번 문자열 +(플러스) 연산 (Concate...함수 사용) 하기는 불편
+           그래서 이 값을 변수로 처리 -> bind Tag           
+-->
+<sql id="search">
+    <if test="keyword!=null">
+        <bind name="keyVal" value="'%'+keyword+'%'"/>
+    </if>
+    <choose>
+        <when test="searchType=='t'.toString()">
+            and title like #{keyVal})
+        </when>
+        <when test="searchType=='c'.toString()">
+            and content like #{keyVal})
+        </when>
+        <when test="searchType=='i'.toString()">
+            and id like #{keyVal})
+        </when>
+        <when test="searchType=='r'.toString()">
+            and regdate like #{keyVal})
+        </when>
+        <when test="searchType=='tc'.toString()">
+            and title like #{keyVal}
+            or content like #{keyVal})
+        </when>
+        <when test="searchType=='tci'.toString()">
+            and title like #{keyVal}
+            or content like #{keyVal}
+            or id like #{keyVal})
+        </when>
+    <otherwise> )</otherwise> <!-- 괄호 닫기 ) 만 넣으면 외의 조건이기 때문에 ) 만 넣어줌 -->
+    </choose>
+</sql>
+
+<select id="searchList" resultType="vo.BoardVO">
+	select seq, id, title, regdate, cnt, root, step, indent 
+	from board 
+	where (seq>0 <include refid="search"></include>
+	order by root desc, step asc
+	limit #{sno}, #{rowsPerPage}
+</select>
+
+<select id="searchCount" resultType="int">
+    select count(*) from board
+    where (seq>0 <include refid="search"></include>
+</select>
+
+
+
+<!-- ** Criteria PageList : ver01
+	=> MySql : limit a , b ( a개 제외하고 a+1 부터 b개 )  적용	-->
+<select id="criList" resultType="vo.BoardVO">
+	select seq, id, title, regdate, cnt, root, step, indent 
+	from board 
+	order by root desc, step asc
+	limit #{sno}, #{rowsPerPage}
+</select>
+
+<select id="criTotalCount" resultType="int">
+	select count(*) from board
+</select>
+
+
+<select id="selectList" resultType="vo.BoardVO">
+	select seq, id, title, regdate, cnt, root, step, indent 
+	from board order by root desc, step asc
+</select>
+
+<select id="selectOne" resultType="vo.BoardVO">
+	select * from board where seq=#{seq}
+</select>
+
+<!-- ** selectKey Test 
+=> AutoNumbering 을 편리하게 할 수 있도록 지원
+=> DB작업중 먼저 어떤 키값을 가져와서 증가시켜서 입력하거나 혹은 입력후에 증가된 키값을 가져올 필요가 있을때마다.
+   selectKey Tag를 이용하면 별도의 쿼리로직 없이 해당 메소드에서 일괄처리할 수가 있음.
+   - keyProperty: selectKey구문의 결과가 셋팅될 대상을 지정
+    			  ( 즉, 매개변수로 전달된 vo의 컬럼중 결과가 셋팅될 컬럼 선택 ) 	 
+   - resultType: 결과의 타입.
+   - order: BEFORE 또는 AFTER
+            BEFORE로 설정하면 키를 먼저 조회하고 그 값을 keyProperty 에 셋팅한 뒤 insert 구문실행.
+            AFTER로 설정하면 insert 구문을 실행한 뒤 selectKey 구문 실행.
+            오라클에서는 insert구문 내부에서 일관된 호출형태로 처리한다.
+   - statementType: STATEMENT, PREPARED 또는 CALLABLE중 하나 선택가능.
+           마이바티스에게 Statement, PreparedStatement 또는 CallableStatement를 사용하게 한다.
+           디폴트는 PREPARED.
+           
+=> OLD insert Sql
+insert into board(seq,id,title,content,root) 
+	values((select * from (select IFNULL(max(seq),0)+1 from board) as temp)
+	,#{id},#{title},#{content}
+	,(select * from (select IFNULL(max(seq),0)+1 from board) as temp))  
+	         
+-->
+<!-- ** 원글 입력 -->
+<insert id="insert">
+	<selectKey keyProperty="seq" resultType="int" order="BEFORE">
+		select IFNULL(max(seq),0)+1 from board
+	</selectKey>
+	insert into board(seq,id,title,content,root) 
+	values(#{seq},#{id},#{title},#{content},#{seq})
+</insert>
+
+<update id="update">
+	update board set title=#{title}, content=#{content} where seq=#{seq}
+</update>	
+	
+<!-- if 조건문 -->	
+<delete id="delete">
+	delete from board
+	<if test="seq==root">where root=#{seq}</if>
+	<!-- 원글 삭제 : 동일 root 는 모두 삭제 -->
+	<if test="seq!=root">where seq=#{seq}</if>
+	<!-- 답글만 삭제 -->
+</delete>	
+
+<!-- ** 조회수 증가	 -->
+<update id="countUp">
+	update board set cnt=cnt+1 where seq=#{seq}
+</update>	
+	
+<!-- ** Reply Insert -->
+<insert id="rinsert">
+	<selectKey keyProperty="seq" resultType="int" order="BEFORE">
+		select IFNULL(max(seq),0)+1 from board
+	</selectKey>
+	insert into board(seq,id,title,content,root,step,indent) 
+	values(#{seq},#{id},#{title},#{content},#{root},#{step},#{indent})
+</insert>	
+<update id="stepUpdate">
+	<selectKey keyProperty="seq" resultType="int" order="BEFORE">
+		select max(seq) from board
+	</selectKey>
+	update board set step=step+1 where root=#{root} and step>=#{step}
+	and seq != #{seq}
+</update>	
+	
+</mapper>  

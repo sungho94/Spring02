@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="mapperInterface.MemberMapper">
+
+<!--  
+** interface 를 통해 ~Mapper 접근
+=> interface ~Mapper.java 의 패키지명 & 화일명과  
+   ~Mapper.xml 의 패키지명 & 화일명 & namespace 값은 같아야됨. 
+   
+=> namespace: 자바클래스에서 mapper 를 찾는 경로
+           다른 mapper와 중복되지 않도록 네임스페이스 기재   
+
+*** mapper 기본사항 
+1) #{id} : parameter 로 전달된 vo 의 id 라는 컬럼의 value 가 전달됨  
+         -> getId() 로 처리함, Map의 경우 키값이 id 인 값을 찾음    
+2) ${id} : id 라는 필드 표현 
+         
+3) CDATA : XML에서는  <,>등 비교연산자의 경우 XML규칙상 에러 나기때문에,
+         이기호를 연산자로 인식하도록 하기 위해서는 SQL문을 CDATA로 묶어 주어야 한다.
+         <![CDATA[ SELECT * FROM table WHERE id > 1 ]]>
+         
+4) 조건문, 반복문, include, selectKey 등          
+-->
+
+<!-- ** SearchCriteria PageList -->
+    <sql id="search">
+    <if test="keyword!=null">
+    <bind name="keyVal" value="'%' + keyword + '%'" />
+    </if>
+    <choose>
+        <when test="searchType=='i'.toString()">
+            and id like #{keyVal} )
+        </when>
+        <when test="searchType=='a'.toString()">
+            and name like #{keyVal} )
+        </when>
+        <when test="searchType=='f'.toString()">
+            and info like #{keyVal} )
+        </when>
+        <when test="searchType=='j'.toString()">
+            and jno like #{keyVal} )
+        </when>
+        <when test="searchType=='b'.toString()">
+            and birthday like #{keyVal} )
+        </when>
+        <when test="searchType=='in'.toString()">
+            and id like #{keyVal}
+            or name like #{keyVal} )
+        </when>
+        <otherwise> )</otherwise>
+    </choose>
+    </sql>
+
+    <select id="searchList" resultType="vo.MemberVO">
+        select * from member
+        where ( id != "admin" <include refid="search"></include>
+        order by id asc
+        limit #{sno}, #{rowsPerPage}
+    </select>
+    
+    <select id="searchCount" resultType="int">
+        select count(*) from member
+        where ( id != "admin" <include refid="search"></include>
+    </select>
+
+<!-- ************************************************************** -->
+<!-- ** Junit Test : totalCount
+       => admin을 제외한 전체 member count 메서드 추가후 Test -->
+    <select id="totalCount" resultType="int">
+        select count(*) from member where id != "admin"
+    </select>
+
+    <select id="selectList" resultType="vo.MemberVO">
+        <![CDATA[select * from member where id <> "admin"]]>
+    </select>
+    
+    <select id="selectOne" resultType="vo.MemberVO">
+        select * from member where id=#{id}
+    </select>
+       <!-- #{id} : parameter 로 전달된 vo 의 id 라는 컬럼의 value 가 전달됨  
+              -> getId() 로 처리함   -->
+
+    <insert id="insert">
+        insert into member values(#{id},#{password},#{name},
+        #{info},#{birthday},#{jno},#{age},#{point})
+    </insert>
+
+    <update id="update">
+        update member set password=#{password}, name=#{name}, info=#{info}, 
+        birthday=#{birthday}, jno=#{jno}, age=#{age}, point=#{point} where id=#{id}
+    </update>
+    
+    <delete id="delete">
+        delete from member where id=#{id}
+    </delete>
+    
+    
+</mapper>
+
